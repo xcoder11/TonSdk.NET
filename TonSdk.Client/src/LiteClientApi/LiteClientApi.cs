@@ -72,7 +72,7 @@ namespace TonSdk.Client
             await Init();
             var res = await _liteClient.GetAccountState(address, block == null ? null : ConvertBlockIdToAdnlBase(block));
             
-            /*
+            
             var cells = BagOfCells.DeserializeBoc(new Bits(res.Proof));
 
             var cs = cells[1].Parse().LoadRef().Parse();
@@ -102,7 +102,7 @@ namespace TonSdk.Client
             bool beforeSplit = cs.LoadBit();
             
             var shardAccountsRef = cs.LoadRef();
-            
+            // ShardAccount a;
             
             if (!shardAccountsRef.IsExotic) 
             {
@@ -134,10 +134,10 @@ namespace TonSdk.Client
                 
             }
             
-            return default;
+            // return default;
             var shardState = cells[0].Parse().Refs[0].Parse().LoadRef().Parse().LoadRef().Parse();
             
-            */
+            
             
             byte[] accountStateBytes = res.State;
             if (accountStateBytes.Length == 0)
