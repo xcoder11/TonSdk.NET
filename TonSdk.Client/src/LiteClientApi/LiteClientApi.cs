@@ -4,8 +4,10 @@ using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TonSdk.Adnl.LiteClient;
+using TonSdk.Adnl.LiteClient.Models;
 using TonSdk.Client.Stack;
 using TonSdk.Core;
 using TonSdk.Core.Block;
@@ -14,32 +16,18 @@ using TonSdk.Core.Crypto;
 
 namespace TonSdk.Client
 {
-    internal class LiteClientApi : IDisposable
+    public class LiteClientApi(string host, int port, string pubKey) : IDisposable
     {
-        private readonly LiteClient _liteClient;
-        
-        internal LiteClientApi(string host, int port, string pubKey)
+        private readonly LiteClient _liteClient = new(host, port, pubKey);
+
+        private async Task Init(CancellationToken ct = default)
         {
-            _liteClient = new LiteClient(host, port, pubKey);
+            await _liteClient.Connect(ct);
         }
 
-        private async Task Init()
+        public async Task<WalletInformationResult> GetWalletInformation(Address address, BlockIdExtended? block = null, CancellationToken ct = default)
         {
-            await _liteClient.Connect();
-        }
-
-        private Adnl.LiteClient.BlockIdExtended ConvertBlockIdToAdnlBase(BlockIdExtended block)
-        {
-            return new Adnl.LiteClient.BlockIdExtended(
-                block.Workchain, 
-                Convert.FromBase64String(block.RootHash),
-                Convert.FromBase64String(block.FileHash),
-                block.Shard, (int)block.Seqno);
-        }
-
-        internal async Task<WalletInformationResult> GetWalletInformation(Address address, BlockIdExtended? block = null)
-        {
-            await Init();
+            await Init(ct);
             
             var result = new WalletInformationResult
             {
@@ -47,7 +35,7 @@ namespace TonSdk.Client
                 Balance = new Coins(0)
             };
 
-            var addressInformation = await GetAddressInformation(address, block);
+            var addressInformation = await GetAddressInformation(address, block, ct);
             result.State = addressInformation.State;
             
             if (addressInformation.State == AccountState.Uninit || addressInformation.State == AccountState.NonExist) 
@@ -66,11 +54,11 @@ namespace TonSdk.Client
             }
             return result;
         }
-        internal async Task<AddressInformationResult> GetAddressInformation(Address address, BlockIdExtended? block = null)
+        public async Task<AddressInformationResult> GetAddressInformation(Address address, BlockIdExtended? block = null, CancellationToken ct = default)
         {
             var result = new AddressInformationResult();
-            await Init();
-            var res = await _liteClient.GetAccountState(address, block == null ? null : ConvertBlockIdToAdnlBase(block));
+            await Init(ct);
+            var res = await _liteClient.GetAccountState(address, block?.ConvertBlockIdToAdnlBase(), ct);
             
             
             var cells = BagOfCells.DeserializeBoc(new Bits(res.Proof));
@@ -85,59 +73,59 @@ namespace TonSdk.Client
             if ((uint)cs.LoadUInt(2) != 0) {
                 throw new Exception("Invalid data");
             }
-
-            var shardPrefixBits = cs.LoadUInt(6);
-            var workchainId = cs.LoadInt(32);
-            var shardPrefix = cs.LoadUInt(64);
-
-            var seqno = cs.LoadUInt(32);
-            var vertSeno = cs.LoadUInt(32);
-            var genUTime = cs.LoadUInt(32);
-            
-            var genLt = cs.LoadUInt(64);
-            var minRefMcSeqno = cs.LoadUInt(32);
-            
-            cs.LoadRef();
-            Console.WriteLine(cs.RestoreRemainder().ToString("hex"));
-            bool beforeSplit = cs.LoadBit();
-            
-            var shardAccountsRef = cs.LoadRef();
-            // ShardAccount a;
-            
-            if (!shardAccountsRef.IsExotic) 
-            {
-                var saOptions = new HashmapOptions<BigInteger, CellSlice>()
-                {
-                    KeySize = 256,
-                    Serializers = new HashmapSerializers<BigInteger, CellSlice>
-                    {
-                        Key = k => new BitsBuilder(256).StoreUInt(k, 256).Build(),
-                        Value = v => new CellBuilder().Build()
-                    },
-                    Deserializers = new HashmapDeserializers<BigInteger, CellSlice>
-                    {
-                        Key = k => k.Parse().LoadUInt(256),
-                        Value = v => v.Parse()
-                    }
-                };
-
-
-                
-                //var ss = shardAccounts.LoadRef().Parse();
-                //ss.LoadBit();
-                
-                Console.WriteLine(Utils.BytesToHex(shardAccountsRef.Parse().Refs[0].Bits.ToBytes()));
-                Console.WriteLine(Utils.BytesToHex(shardAccountsRef.Parse().Refs[1].Bits.ToBytes()));
-
-                //Console.WriteLine(ss.LoadUInt(64));
-                //Console.WriteLine(ss.RemainderBits);
-                
-            }
-            
-            // return default;
-            var shardState = cells[0].Parse().Refs[0].Parse().LoadRef().Parse().LoadRef().Parse();
-            
-            
+            //
+            // var shardPrefixBits = cs.LoadUInt(6);
+            // var workchainId = cs.LoadInt(32);
+            // var shardPrefix = cs.LoadUInt(64);
+            //
+            // var seqno = cs.LoadUInt(32);
+            // var vertSeno = cs.LoadUInt(32);
+            // var genUTime = cs.LoadUInt(32);
+            //
+            // var genLt = cs.LoadUInt(64);
+            // var minRefMcSeqno = cs.LoadUInt(32);
+            //
+            // cs.LoadRef();
+            // Console.WriteLine(cs.RestoreRemainder().ToString("hex"));
+            // bool beforeSplit = cs.LoadBit();
+            //
+            // var shardAccountsRef = cs.LoadRef();
+            // // ShardAccount a;
+            //
+            // if (!shardAccountsRef.IsExotic) 
+            // {
+            //     var saOptions = new HashmapOptions<BigInteger, CellSlice>()
+            //     {
+            //         KeySize = 256,
+            //         Serializers = new HashmapSerializers<BigInteger, CellSlice>
+            //         {
+            //             Key = k => new BitsBuilder(256).StoreUInt(k, 256).Build(),
+            //             Value = v => new CellBuilder().Build()
+            //         },
+            //         Deserializers = new HashmapDeserializers<BigInteger, CellSlice>
+            //         {
+            //             Key = k => k.Parse().LoadUInt(256),
+            //             Value = v => v.Parse()
+            //         }
+            //     };
+            //
+            //
+            //     
+            //     //var ss = shardAccounts.LoadRef().Parse();
+            //     //ss.LoadBit();
+            //     
+            //     Console.WriteLine(Utils.BytesToHex(shardAccountsRef.Parse().Refs[0].Bits.ToBytes()));
+            //     Console.WriteLine(Utils.BytesToHex(shardAccountsRef.Parse().Refs[1].Bits.ToBytes()));
+            //
+            //     //Console.WriteLine(ss.LoadUInt(64));
+            //     //Console.WriteLine(ss.RemainderBits);
+            //     
+            // }
+            //
+            // // return default;
+            // var shardState = cells[0].Parse().Refs[0].Parse().LoadRef().Parse().LoadRef().Parse();
+            //
+            //
             
             byte[] accountStateBytes = res.State;
             if (accountStateBytes.Length == 0)
@@ -205,34 +193,34 @@ namespace TonSdk.Client
             
             return result;
         }
-        internal async Task<MasterchainInformationResult> GetMasterchainInfo()
+        public async Task<MasterchainInformationResult> GetMasterchainInfo(CancellationToken ct = default)
         {
-            await Init();
-            return new MasterchainInformationResult(await _liteClient.GetMasterChainInfo());
+            await Init(ct);
+            return new MasterchainInformationResult(await _liteClient.GetMasterChainInfo(ct));
         }
 
-        internal async Task<SendBocResult> SendBoc(Cell boc)
+        public async Task<SendBocResult> SendBoc(Cell boc, CancellationToken ct = default)
         {
-            await Init();
-            var data = await _liteClient.SendMessage(BagOfCells.SerializeBoc(boc).ToBytes());
+            await Init(ct);
+            var data = await _liteClient.SendMessage(BagOfCells.SerializeBoc(boc).ToBytes(), ct);
             return new SendBocResult() { Type = data.ToString(), Hash = boc.Hash.ToString()};
         }
 
-        internal async Task<BlockIdExtended> LookUpBlock(int workchain, long shard, long? seqno = null, ulong? lt = null, ulong? unixTime = null)
+        public async Task<BlockIdExtended> LookUpBlock(int workchain, long shard, long? seqno = null, ulong? lt = null, ulong? unixTime = null, CancellationToken ct = default)
         {
-            await Init();
-            var blockHeader = await _liteClient.LookUpBlock(workchain, shard, seqno, lt, unixTime);
+            await Init(ct);
+            var blockHeader = await _liteClient.LookUpBlock(workchain, shard, seqno, lt, unixTime, ct);
             return new BlockIdExtended(blockHeader.BlockId);
         }
         
-        internal async Task<BlockDataResult> GetBlockData(int workchain, long shard, long seqno)
+        public async Task<BlockDataResult> GetBlockData(int workchain, long shard, long seqno, CancellationToken ct = default)
         {
             var result = new BlockDataResult();
-            await Init();
-            var blockHeader = await _liteClient.LookUpBlock(workchain, shard, seqno);
+            await Init(ct);
+            var blockHeader = await _liteClient.LookUpBlock(workchain, shard, seqno, ct: ct);
             result.BlockIdExtended = new BlockIdExtended(blockHeader.BlockId);
             
-            byte[] blockDataBytes = await _liteClient.GetBlock(blockHeader.BlockId);
+            byte[] blockDataBytes = await _liteClient.GetBlock(blockHeader.BlockId, ct);
             if (blockDataBytes.Length == 0) 
                 return result;
             
@@ -241,27 +229,27 @@ namespace TonSdk.Client
             return result;
         }
 
-        internal async Task<BlockTransactionsResult> GetBlockTransactions(
+        public async Task<BlockTransactionsResult> GetBlockTransactions(
             int workchain,
             long shard,
             long seqno,
-            string rootHash = null,
-            string fileHash = null,
+            string? rootHash = null,
+            string? fileHash = null,
             ulong? afterLt = null,
-            string afterHash = null,
-            uint count = 10)
+            string? afterHash = null,
+            uint count = 10, CancellationToken ct = default)
         {
             var result = new BlockTransactionsResult();
-            await Init();
+            await Init(ct);
 
-            Adnl.LiteClient.BlockIdExtended blockId;
+            Adnl.LiteClient.Models.BlockIdExtended blockId;
             if (rootHash == null || fileHash == null)
-                blockId = (await _liteClient.LookUpBlock(workchain, shard, seqno)).BlockId;
+                blockId = (await _liteClient.LookUpBlock(workchain, shard, seqno, ct: ct)).BlockId;
             else
-                blockId = new Adnl.LiteClient.BlockIdExtended(workchain, Convert.FromBase64String(rootHash),
+                blockId = new Adnl.LiteClient.Models.BlockIdExtended(workchain, Convert.FromBase64String(rootHash),
                     Convert.FromBase64String(fileHash), shard, (int)seqno);
 
-            var transactionId = new Adnl.LiteClient.TransactionId();
+            var transactionId = new Adnl.LiteClient.Models.TransactionId();
             if (afterLt != null && afterHash != null)
             {
                 transactionId.Hash = Convert.FromBase64String(afterHash);
@@ -284,29 +272,29 @@ namespace TonSdk.Client
             return result;
         }
         
-        internal async Task<BlockTransactionsResultExtended> GetBlockTransactionsExtended(
+        public async Task<BlockTransactionsResultExtended> GetBlockTransactionsExtended(
             int workchain,
             long shard,
             long seqno,
-            string rootHash = null,
-            string fileHash = null,
+            string? rootHash = null,
+            string? fileHash = null,
             ulong? afterLt = null,
-            string afterHash = null,
-            uint count = 10)
+            string? afterHash = null,
+            uint count = 10, CancellationToken ct = default)
         {
             try
             {
                 var result = new BlockTransactionsResultExtended();
-                await Init();
+                await Init(ct);
 
-                Adnl.LiteClient.BlockIdExtended blockId;
+                Adnl.LiteClient.Models.BlockIdExtended blockId;
                 if (rootHash == null || fileHash == null)
-                    blockId = (await _liteClient.LookUpBlock(workchain, shard, seqno)).BlockId;
+                    blockId = (await _liteClient.LookUpBlock(workchain, shard, seqno, ct: ct)).BlockId;
                 else
-                    blockId = new Adnl.LiteClient.BlockIdExtended(workchain, Convert.FromBase64String(rootHash),
+                    blockId = new Adnl.LiteClient.Models.BlockIdExtended(workchain, Convert.FromBase64String(rootHash),
                         Convert.FromBase64String(fileHash), shard, (int)seqno);
 
-                var transactionId = new Adnl.LiteClient.TransactionId();
+                var transactionId = new Adnl.LiteClient.Models.TransactionId();
                 if (afterLt != null && afterHash != null)
                 {
                     transactionId.Hash = Convert.FromBase64String(afterHash);
@@ -314,14 +302,14 @@ namespace TonSdk.Client
                 }
                 else transactionId = null;
             
-                var blockTransactions = await _liteClient.ListBlockTransactionsExtended(blockId, count, transactionId);
+                var blockTransactions = await _liteClient.ListBlockTransactionsExtended(blockId, count, transactionId, ct: ct);
                 
                 result.Incomplete = blockTransactions.InComplete;
                 result.ReqCount = (int)count;
                 result.Id = new BlockIdExtended(blockId);
                 if (blockTransactions.Transactions.Length == 0)
                 {
-                    result.Transactions = Array.Empty<TransactionsInformationResult>();
+                    result.Transactions = [];
                     return result;
                 }
 
@@ -336,14 +324,14 @@ namespace TonSdk.Client
             }
         }
 
-        internal async Task<TransactionsInformationResult[]> GetTransactions(Address address, uint limit, long lt, string hash)
+        public async Task<TransactionsInformationResult[]> GetTransactions(Address address, uint limit, long lt, string hash, CancellationToken ct = default)
         {
             try
             {
                 var result = new List<TransactionsInformationResult>();
-                await Init();
+                await Init(ct);
 
-                byte[] transactions = await _liteClient.GetTransactions(limit, address, lt, hash);
+                byte[] transactions = await _liteClient.GetTransactions(limit, address, lt, hash, ct);
 
                 if (transactions.Length == 0)
                     return result.ToArray();
@@ -361,14 +349,14 @@ namespace TonSdk.Client
             }
         }
 
-        internal async Task<RunGetMethodResult?> RunGetMethod(Address address, string method, IStackItem[] stackItems, BlockIdExtended? blockId = null)
+        public async Task<RunGetMethodResult?> RunGetMethod(Address address, string method, IStackItem[] stackItems, BlockIdExtended? blockId = null, CancellationToken ct = default)
         {
-            await Init();
+            await Init(ct);
             
             var result = new RunGetMethodResult();
             byte[] stackBytes = BagOfCells.SerializeBoc(StackUtils.SerializeStack(stackItems)).ToBytes();
             var smcResult = await _liteClient.RunSmcMethod(address, method, stackBytes, new RunSmcOptions() { Result = true },
-                blockId == null ? null : ConvertBlockIdToAdnlBase(blockId));
+                blockId?.ConvertBlockIdToAdnlBase(), ct);
             try
             {
                 var resultStack = StackUtils.DeserializeStack(Convert.ToBase64String(smcResult.Result));
@@ -378,35 +366,35 @@ namespace TonSdk.Client
             }
             catch (Exception e)
             {
-                return null;
+                throw;
             }
         }
 
-        internal async Task<ConfigParamResult> GetConfigParam(int configId)
+        public async Task<ConfigParamResult> GetConfigParam(int configId, CancellationToken ct = default)
         {
-            await Init();
+            await Init(ct);
             
             var result = new ConfigParamResult();
-            byte[] configBytes = (await _liteClient.GetConfigParams(new int[] { configId })).ConfigProof;
+            byte[] configBytes = (await _liteClient.GetConfigParams([configId], ct: ct)).ConfigProof;
             result.Bytes = Cell.From(new Bits(configBytes));
             return result;
         }
 
-        internal async Task<EstimateFeeResult> EstimateFee(MessageX messageX, bool ignore = true)
+        public async Task<EstimateFeeResult> EstimateFee(MessageX messageX, bool ignore = true, CancellationToken ct = default)
         {
-            await Init();
+            await Init(ct);
             var result = new EstimateFeeResult();
             return result;
         }
 
-        internal async Task<ShardsInformationResult> GetShards(long seqno)
+        public async Task<ShardsInformationResult> GetShards(long seqno, CancellationToken ct = default)
         {
             try
             {
-                await Init();
+                await Init(ct);
                 var result = new ShardsInformationResult();
-                var block = (await _liteClient.LookUpBlock(-1, -9223372036854775808, seqno)).BlockId;
-                byte[] data = (await _liteClient.GetAllShardsInfo(block));
+                var block = (await _liteClient.LookUpBlock(-1, -9223372036854775808, seqno, ct: ct)).BlockId;
+                var data = (await _liteClient.GetAllShardsInfo(block, ct));
                 var cells = BagOfCells.DeserializeBoc(new Bits(data));
 
                 foreach (var cell in cells)
@@ -465,7 +453,7 @@ namespace TonSdk.Client
             slice.LoadUInt(32);
             long shard = (long)slice.LoadInt(64);
 
-            return new BlockIdExtended(new TonSdk.Adnl.LiteClient.BlockIdExtended(0, rootHash, fileHash, shard, seqno));
+            return new BlockIdExtended(new Adnl.LiteClient.Models.BlockIdExtended(0, rootHash, fileHash, shard, seqno));
         }
         
         private void LoadBinTreeR(CellSlice slice, ref List<BlockIdExtended> shards)

@@ -2,9 +2,8 @@
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
-using Utils = TonSdk.Core.Crypto.Utils;
 
-namespace TonSdk.Adnl;
+namespace TonSdk.Adnl.Adnl;
 
 internal class AdnlAddress
 {
@@ -19,7 +18,7 @@ internal class AdnlAddress
     {
         publicKey = publicKey.Trim();
 
-        if (IsHex(publicKey)) PublicKey = Utils.HexToBytes(publicKey);
+        if (IsHex(publicKey)) PublicKey = Core.Crypto.Utils.HexToBytes(publicKey);
         else if (IsBase64(publicKey)) PublicKey = Convert.FromBase64String(publicKey);
         else throw new Exception("ADNLAddress: Bad peer public key.");
         if (PublicKey.Length != 32)

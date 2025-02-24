@@ -1,6 +1,7 @@
 ﻿using System;
+using System.Text;
 
-namespace TonSdk.Adnl.LiteClient;
+namespace TonSdk.Adnl.Utils;
 
 public class Crc32
 {
@@ -41,6 +42,11 @@ public class Crc32
         var result = BitConverter.GetBytes(ComputeChecksumUint(bytes));
         if (!BitConverter.IsLittleEndian) Array.Reverse(result);
         return result;
+    }
+
+    public static uint Code(string functionName)
+    {
+        return BitConverter.ToUInt32(ComputeChecksum(Encoding.UTF8.GetBytes(functionName)), 0);
     }
 
     internal static ushort CalculateCrc16Xmodem(byte[] data)

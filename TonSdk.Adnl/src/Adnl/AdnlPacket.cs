@@ -3,7 +3,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using TonSdk.Core.Boc;
 
-namespace TonSdk.Adnl;
+namespace TonSdk.Adnl.Adnl;
 
 internal class AdnlPacket
 {
