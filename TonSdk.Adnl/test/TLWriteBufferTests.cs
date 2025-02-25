@@ -26,10 +26,7 @@ public class TLWriteBufferTests
     public void Test_Int256WithZeroLastByteCanBeWritten()
     {
         var bytes = new byte[32];
-        for (var i = 0; i < 31; ++i)
-        {
-            bytes[i] = (byte)i;
-        }
+        for (var i = 0; i < 31; ++i) bytes[i] = (byte)i;
 
         bytes[31] = 0;
 
@@ -52,8 +49,8 @@ public class TLWriteBufferTests
     // AdnlKeys generation logic
     private static byte[] GenerateRandomBytes(int byteSize)
     {
-        using RandomNumberGenerator randomNumberGenerator = RandomNumberGenerator.Create();
-        byte[] randomBytes = new byte[byteSize];
+        using var randomNumberGenerator = RandomNumberGenerator.Create();
+        var randomBytes = new byte[byteSize];
         randomNumberGenerator.GetBytes(randomBytes);
         return randomBytes;
     }

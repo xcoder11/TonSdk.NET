@@ -1,9 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net6.0;net7.0;netstandard2.1</TargetFrameworks>
         <ImplicitUsings>disable</ImplicitUsings>
-        <LangVersion>8.0</LangVersion>
+        <LangVersion>13</LangVersion>
         <RootNamespace>TonSdk.Adnl</RootNamespace>
         <PackageId>TonSdk.Adnl</PackageId>
         <Version>0.2.4</Version>
@@ -11,6 +10,8 @@
         <PackageDescription>Library that allows to interact with Ton ADNL</PackageDescription>
         <RepositoryUrl>https://github.com/continuation-team/TonSdk.NET</RepositoryUrl>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Nullable>enable</Nullable>
+        <TargetFramework>net9.0</TargetFramework>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -19,12 +20,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="README.MD" Pack="true" PackagePath="" />
-        <None Include="../../LICENSE" Pack="true" PackagePath="" />
+        <None Include="README.MD" Pack="true" PackagePath=""/>
+        <None Include="../../LICENSE" Pack="true" PackagePath=""/>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="TonSdk.Core" Version="0.3.3" />
+        <PackageReference Include="TonSdk.Core" Version="0.3.9"/>
     </ItemGroup>
 
 </Project>

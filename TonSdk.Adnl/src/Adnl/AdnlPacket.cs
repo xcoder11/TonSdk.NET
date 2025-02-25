@@ -3,78 +3,74 @@ using System.Linq;
 using System.Security.Cryptography;
 using TonSdk.Core.Boc;
 
-namespace TonSdk.Adnl
+namespace TonSdk.Adnl.Adnl;
+
+internal class AdnlPacket
 {
-    internal class AdnlPacket
+    internal const byte PacketMinSize = 68; // 4 (size) + 32 (nonce) + 32 (hash)
+
+    internal AdnlPacket(byte[] payload, byte[]? nonce = null)
     {
-        internal const byte PacketMinSize = 68; // 4 (size) + 32 (nonce) + 32 (hash)
+        Nonce = nonce ?? AdnlKeys.GenerateRandomBytes(32);
+        Payload = payload;
+    }
 
-        private byte[] _payload;
-        private byte[] _nonce;
+    internal byte[] Payload { get; }
 
-        internal AdnlPacket(byte[] payload, byte[]? nonce = null)
+    private byte[] Nonce { get; }
+
+    private byte[] Hash
+    {
+        get
         {
-            _nonce = nonce ?? AdnlKeys.GenerateRandomBytes(32);
-            _payload = payload;
+            using var sha256 = SHA256.Create();
+            var sha256Hash = sha256.ComputeHash(Nonce.Concat(Payload).ToArray());
+            return sha256Hash;
         }
+    }
 
-        internal byte[] Payload => _payload;
-
-        private byte[] Nonce => _nonce;
-
-        private byte[] Hash
+    private byte[] Size
+    {
+        get
         {
-            get 
-            { 
-                using SHA256 sha256 = SHA256.Create();
-                byte[] sha256Hash = sha256.ComputeHash(_nonce.Concat(_payload).ToArray());
-                return sha256Hash; 
-            }
+            var size = (uint)(32 + 32 + Payload.Length);
+            var builder = new BitsBuilder().StoreUInt32LE(size).Build();
+            return builder.ToBytes();
         }
+    }
 
-        private byte[] Size
-        {
-            get
-            {
-                uint size = (uint)(32 + 32 + _payload.Length);
-                Bits builder = new BitsBuilder().StoreUInt32LE(size).Build();
-                return builder.ToBytes();
-            }
-        }
+    internal byte[] Data => Size.Concat(Nonce).Concat(Payload).Concat(Hash).ToArray();
 
-        internal byte[] Data => Size.Concat(Nonce).Concat(Payload).Concat(Hash).ToArray();
+    internal int Length => PacketMinSize + Payload.Length;
 
-        internal int Length => PacketMinSize + _payload.Length;
+    internal static AdnlPacket? Parse(byte[] data)
+    {
+        if (data.Length < 4) return null;
+        var cursor = 0;
 
-        internal static AdnlPacket? Parse(byte[] data)
-        {
-            if (data.Length < 4) return null;
-            int cursor = 0;
+        var slice = new Bits(data).Parse();
 
-            BitsSlice slice = new Bits(data).Parse();
+        var size = (uint)slice.LoadUInt32LE();
+        cursor += 4;
 
-            uint size = (uint)slice.LoadUInt32LE();
-            cursor += 4;
+        if (data.Length - 4 < size) return null;
 
-            if (data.Length - 4 < size) return null;
+        var nonce = new byte[32];
+        Array.Copy(data, cursor, nonce, 0, 32);
+        cursor += 32;
 
-            byte[] nonce = new byte[32];
-            Array.Copy(data, cursor, nonce, 0, 32);
-            cursor += 32;
+        var payload = new byte[size - (32 + 32)];
+        Array.Copy(data, cursor, payload, 0, size - (32 + 32));
+        cursor += (int)size - (32 + 32);
 
-            byte[] payload = new byte[size - (32 + 32)];
-            Array.Copy(data, cursor, payload, 0, size - (32 + 32));
-            cursor += (int)size - (32 + 32);
+        var hash = new byte[32];
+        Array.Copy(data, cursor, hash, 0, 32);
 
-            byte[] hash = new byte[32];
-            Array.Copy(data, cursor, hash, 0, 32);
-            
-            using SHA256 sha256 = SHA256.Create();
-            byte[] target = sha256.ComputeHash(nonce.Concat(payload).ToArray());
+        using var sha256 = SHA256.Create();
+        var target = sha256.ComputeHash(nonce.Concat(payload).ToArray());
 
-            if (!hash.SequenceEqual(target)) throw new Exception("ADNLPacket: Bad packet hash.");
+        if (!hash.SequenceEqual(target)) throw new Exception("ADNLPacket: Bad packet hash.");
 
-            return new AdnlPacket(payload, nonce);
-        }
+        return new AdnlPacket(payload, nonce);
     }
 }
