@@ -1,4 +1,4 @@
-fork of [![TonSdk.NET](https://github.com/continuation-team/TonSdk.NET)
+fork of [[TonSdk.NET](https://github.com/continuation-team/TonSdk.NET)
 
 ## License
 
